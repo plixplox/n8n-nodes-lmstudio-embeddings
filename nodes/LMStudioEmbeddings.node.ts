@@ -1,3 +1,4 @@
+// From nodes/LMStudioEmbeddings.node.ts
 import {
     ILoadOptionsFunctions,
     INodePropertyOptions,
@@ -123,7 +124,40 @@ export class LMStudioEmbeddings implements INodeType {
                 });
 
                 return data[0].embedding;
-			}
+			},
+            embedDocuments: async (texts: string[]): Promise<number[][]> => {
+                const credentials = await this.getCredentials('lmStudioApi');
+                const model = this.getNodeParameter('model', itemIndex) as string;
+                const encodingFormat = this.getNodeParameter('encodingFormat', itemIndex) as 'float' | 'base64';
+
+                const allEmbeddings: number[][] = [];
+
+                for (const text of texts) {
+                    if (!text || !text.trim()) {
+                        console.warn('Skipping empty text content');
+                        continue;
+                    }
+
+                    const embeddings = new OpenAIEmbeddings({
+                        configuration: {
+                            baseURL: credentials.baseUrl as string,
+                        },
+                        apiKey: credentials.apiKey as string,
+                        model: model,
+                    });
+
+                    // @ts-ignore
+                    const { data } = await embeddings.embeddingWithRetry({
+                        model: model,
+                        input: text,
+                        encoding_format: encodingFormat,
+                    });
+
+                    allEmbeddings.push(data[0].embedding);
+                }
+
+                return allEmbeddings;
+            }
 		};
 
 		return {
