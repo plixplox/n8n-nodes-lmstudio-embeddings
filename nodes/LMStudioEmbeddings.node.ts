@@ -10,102 +10,102 @@ import {
 import { OpenAIEmbeddings } from "@langchain/openai";
 
 export class LMStudioEmbeddings implements INodeType {
-	description: INodeTypeDescription = {
-		displayName: 'LM Studio Embeddings',
-		name: 'lmStudioEmbeddings',
-		icon: 'file:lmstudio.svg',
-		group: ['transform'],
-		version: 1,
-		description: 'Generate embeddings using LM Studio API',
-		defaults: {
-			name: 'LM Studio Embeddings',
-		},
-		inputs: [],
-		outputs: [NodeConnectionType.AiEmbedding],
-		credentials: [
-			{
-				name: 'lmStudioApi',
-				required: true,
-			},
-		],
-		properties: [
-			{
-				displayName: 'Model',
-				name: 'model',
-				type: 'options',
-				typeOptions: {
-					loadOptionsMethod: 'getModels',
-				},
-				default: '',
-				description: 'The embedding model to use',
-				required: true,
-			},
-			{
-				displayName: 'Encoding Format',
-				name: 'encodingFormat',
-				type: 'options',
-				options: [
-					{
-						name: 'Float',
-						value: 'float',
-						description: 'Return embeddings as floating point numbers',
-					},
-					{
-						name: 'Base64',
-						value: 'base64',
-						description: 'Return embeddings encoded as base64',
-					},
-				],
-				default: 'float',
-				description: 'The format for the embeddings',
-			}
-		],
-	};
+    description: INodeTypeDescription = {
+        displayName: 'LM Studio Embeddings',
+        name: 'lmStudioEmbeddings',
+        icon: 'file:lmstudio.svg',
+        group: ['transform'],
+        version: 1,
+        description: 'Generate embeddings using LM Studio API',
+        defaults: {
+            name: 'LM Studio Embeddings',
+        },
+        inputs: [],
+        outputs: [NodeConnectionType.AiEmbedding],
+        credentials: [
+            {
+                name: 'lmStudioApi',
+                required: true,
+            },
+        ],
+        properties: [
+            {
+                displayName: 'Model',
+                name: 'model',
+                type: 'options',
+                typeOptions: {
+                    loadOptionsMethod: 'getModels',
+                },
+                default: '',
+                description: 'The embedding model to use',
+                required: true,
+            },
+            {
+                displayName: 'Encoding Format',
+                name: 'encodingFormat',
+                type: 'options',
+                options: [
+                    {
+                        name: 'Float',
+                        value: 'float',
+                        description: 'Return embeddings as floating point numbers',
+                    },
+                    {
+                        name: 'Base64',
+                        value: 'base64',
+                        description: 'Return embeddings encoded as base64',
+                    },
+                ],
+                default: 'float',
+                description: 'The format for the embeddings',
+            }
+        ],
+    };
 
-	methods = {
-		loadOptions: {
-			async getModels(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-				const credentials = await this.getCredentials('lmStudioApi');
-				
-				try {
-					const response = await fetch(`${credentials.baseUrl}/models`, {
-						method: 'GET',
-						headers: {
-							'Content-Type': 'application/json',
-							...(credentials.apiKey && { Authorization: `Bearer ${credentials.apiKey}` }),
-						},
-					});
+    methods = {
+        loadOptions: {
+            async getModels(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+                const credentials = await this.getCredentials('lmStudioApi');
 
-					if (!response.ok) {
-						throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`);
-					}
+                try {
+                    const response = await fetch(`${credentials.baseUrl}/models`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(credentials.apiKey && { Authorization: `Bearer ${credentials.apiKey}` }),
+                        },
+                    });
 
-					const result = await response.json() as { data?: Array<{ id: string }> };
-					const models = result.data || [];
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`);
+                    }
 
-					return models.map((model) => ({
-						name: model.id,
-						value: model.id,
-					}));
-				} catch (error) {
-					throw new Error(`Error fetching models from LM Studio: ${error instanceof Error ? error.message : 'Unknown error'}`);
-				}
-			},
-		},
-	};
+                    const result = await response.json() as { data?: Array<{ id: string }> };
+                    const models = result.data || [];
+
+                    return models.map((model) => ({
+                        name: model.id,
+                        value: model.id,
+                    }));
+                } catch (error) {
+                    throw new Error(`Error fetching models from LM Studio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                }
+            },
+        },
+    };
 
     async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		// Создаем объект с методом embedQuery для vector store
-		const embeddingProvider = {
-			embedQuery: async (text: string): Promise<number[]> => {
-				const credentials = await this.getCredentials('lmStudioApi');
-				const model = this.getNodeParameter('model', itemIndex) as string;
-				const encodingFormat = this.getNodeParameter('encodingFormat', itemIndex) as 'float' | 'base64';
+        // Создаем объект с методом embedQuery для vector store
+        const embeddingProvider = {
+            embedQuery: async (text: string): Promise<number[]> => {
+                const credentials = await this.getCredentials('lmStudioApi');
+                const model = this.getNodeParameter('model', itemIndex) as string;
+                const encodingFormat = this.getNodeParameter('encodingFormat', itemIndex) as 'float' | 'base64';
 
 
-				if (!text || !text.trim()) {
-					throw new Error('Text content is empty');
-				}
+                if (!text || !text.trim()) {
+                    throw new Error('Text content is empty');
+                }
 
                 const embeddings = new OpenAIEmbeddings({
                     configuration: {
@@ -123,11 +123,11 @@ export class LMStudioEmbeddings implements INodeType {
                 });
 
                 return data[0].embedding;
-			}
-		};
+            }
+        };
 
-		return {
-			response: embeddingProvider,
-		};
-	}
+        return {
+            response: embeddingProvider,
+        };
+    }
 }
