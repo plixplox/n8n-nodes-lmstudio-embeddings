@@ -4,9 +4,22 @@ import {
     INodeType,
     INodeTypeDescription,
     ISupplyDataFunctions,
-    NodeConnectionType,
     SupplyData,
 } from 'n8n-workflow';
+
+interface LMStudioEmbeddingResponse {
+    data: Array<{
+        embedding: number[];        // для float
+        // если encoding_format = 'base64', то embedding будет строкой, но мы пока поддерживаем только float
+        index?: number;
+        object?: string;
+    }>;
+    model: string;
+    usage?: {
+        prompt_tokens: number;
+        total_tokens: number;
+    };
+}
 
 export class LMStudioEmbeddings implements INodeType {
     description: INodeTypeDescription = {
@@ -20,7 +33,7 @@ export class LMStudioEmbeddings implements INodeType {
             name: 'LM Studio Embeddings',
         },
         inputs: [],
-        outputs: [NodeConnectionType.AiEmbedding],
+        outputs: ['ai_embedding'], // используем строку вместо enum NodeConnectionType.AiEmbedding для совместимости
         credentials: [
             {
                 name: 'lmStudioApi',
@@ -102,7 +115,7 @@ export class LMStudioEmbeddings implements INodeType {
             throw new Error('No base URL provided in LM Studio API credentials');
         }
 
-        const requestEmbeddings = async (input: string | string[]): Promise<any> => {
+        const requestEmbeddings = async (input: string | string[]): Promise<LMStudioEmbeddingResponse> => {
             const url = `${credentials.baseUrl}/embeddings`;
             const body = {
                 model: model,
@@ -123,7 +136,7 @@ export class LMStudioEmbeddings implements INodeType {
                 throw new Error(`Embedding request failed: ${response.status} ${response.statusText}`);
             }
 
-            const result = await response.json();
+            const result = await response.json() as LMStudioEmbeddingResponse;
             if (!result.data || !Array.isArray(result.data)) {
                 throw new Error('Invalid response from LM Studio: missing data array');
             }
@@ -140,6 +153,14 @@ export class LMStudioEmbeddings implements INodeType {
                     throw new Error('Invalid embedding in response');
                 }
                 return result.data[0].embedding;
+            },
+            embedDocuments: async (texts: string[]): Promise<number[][]> => {
+                if (texts.length === 0) return [];
+                const result = await requestEmbeddings(texts);
+                if (result.data.length !== texts.length) {
+                    throw new Error('Response data length does not match input length');
+                }
+                return result.data.map((item) => item.embedding);
             },
         };
 
