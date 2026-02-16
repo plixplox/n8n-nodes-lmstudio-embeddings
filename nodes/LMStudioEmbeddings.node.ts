@@ -7,7 +7,6 @@ import {
     NodeConnectionType,
     SupplyData,
 } from 'n8n-workflow';
-import { OpenAIEmbeddings } from "@langchain/openai";
 
 export class LMStudioEmbeddings implements INodeType {
     description: INodeTypeDescription = {
@@ -95,35 +94,53 @@ export class LMStudioEmbeddings implements INodeType {
     };
 
     async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-        // Создаем объект с методом embedQuery для vector store
+        const credentials = await this.getCredentials('lmStudioApi');
+        const model = this.getNodeParameter('model', itemIndex) as string;
+        const encodingFormat = this.getNodeParameter('encodingFormat', itemIndex) as 'float' | 'base64';
+
+        if (!credentials.baseUrl) {
+            throw new Error('No base URL provided in LM Studio API credentials');
+        }
+
+        const requestEmbeddings = async (input: string | string[]): Promise<any> => {
+            const url = `${credentials.baseUrl}/embeddings`;
+            const body = {
+                model: model,
+                input: input,
+                encoding_format: encodingFormat,
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(credentials.apiKey && { Authorization: `Bearer ${credentials.apiKey}` }),
+                },
+                body: JSON.stringify(body),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Embedding request failed: ${response.status} ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            if (!result.data || !Array.isArray(result.data)) {
+                throw new Error('Invalid response from LM Studio: missing data array');
+            }
+            return result;
+        };
+
         const embeddingProvider = {
             embedQuery: async (text: string): Promise<number[]> => {
-                const credentials = await this.getCredentials('lmStudioApi');
-                const model = this.getNodeParameter('model', itemIndex) as string;
-                const encodingFormat = this.getNodeParameter('encodingFormat', itemIndex) as 'float' | 'base64';
-
-
                 if (!text || !text.trim()) {
                     throw new Error('Text content is empty');
                 }
-
-                const embeddings = new OpenAIEmbeddings({
-                    configuration: {
-                        baseURL: credentials.baseUrl as string,
-                    },
-                    apiKey: credentials.apiKey as string,
-                    model: model,
-                });
-
-                // @ts-ignore
-                const { data } = await embeddings.embeddingWithRetry({
-                    model: model,
-                    input: text,
-                    encoding_format: encodingFormat,
-                });
-
-                return data[0].embedding;
-            }
+                const result = await requestEmbeddings(text);
+                if (!result.data[0] || !result.data[0].embedding) {
+                    throw new Error('Invalid embedding in response');
+                }
+                return result.data[0].embedding;
+            },
         };
 
         return {
